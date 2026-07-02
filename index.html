@@ -376,7 +376,7 @@ function isSolicReq(t){ return t.solicitante===ME && t.executor && t.executor!==
 function isSolicConf(t){ return t.solicitante===ME && t.executor && t.executor!==ME && t.done && !t.confirmado; }
 
 function el(h){const d=document.createElement('div');d.innerHTML=h.trim();return d.firstChild;}
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 function taskCard(t){
   const b=bucketOf(t);
