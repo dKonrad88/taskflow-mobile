@@ -169,6 +169,7 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
     <div class="tab"        data-tab="late"    onclick="switchTab('late')">Atrasadas <span class="tcount" id="tc-late">0</span></div>
     <div class="tab"        data-tab="today"   onclick="switchTab('today')">Hoje <span class="tcount" id="tc-today">0</span></div>
     <div class="tab"        data-tab="tom"     onclick="switchTab('tom')">Amanhã <span class="tcount" id="tc-tom">0</span></div>
+    <div class="tab"        data-tab="reunioes" onclick="switchTab('reunioes')">Reuniões <span class="tcount" id="tc-reunioes">0</span></div>
     <div class="tab"        data-tab="solic"   onclick="switchTab('solic')">Solicitadas <span class="tcount" id="tc-solic">0</span></div>
     <div class="tab"        data-tab="notas"   onclick="switchTab('notas')">Notas <span class="tcount" id="tc-notas">0</span></div>
   </nav>
@@ -201,6 +202,10 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
       <div class="panel-hint"><i class="ti ti-inbox"></i> Capturas sem dono — classifique depois</div>
       <div id="list-organizar"></div>
     </div>
+    <div class="panel" id="p-reunioes">
+      <div class="panel-hint"><i class="ti ti-speakerphone"></i> Conduza a reunião pelo celular — pauta, tarefas, decisões e ATA</div>
+      <div id="list-reunioes"></div>
+    </div>
     <div class="panel" id="p-notas"><div id="list-notas"></div></div>
   </main>
 
@@ -214,8 +219,19 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
       <div class="sheet-title">Adicionar rápido</div>
       <div class="choice-row">
         <div class="choice" onclick="openQA('task')"><i class="ti ti-square-plus"></i><span class="lbl">Nova tarefa</span></div>
+        <div class="choice" onclick="openQA('reun')"><i class="ti ti-speakerphone"></i><span class="lbl">Nova reunião</span></div>
         <div class="choice" onclick="openQA('note')"><i class="ti ti-note"></i><span class="lbl">Nova nota</span></div>
       </div>
+    </div>
+    <div class="qa" id="qa-reun">
+      <button class="qa-back" onclick="backToChoose()"><i class="ti ti-arrow-left"></i> Voltar</button>
+      <input class="qa-inp" id="reun-new-titulo" placeholder="Título da reunião" autocomplete="off">
+      <div class="when-row">
+        <div class="when sel" data-rwhen="today" onclick="pickReunWhen(this)">Hoje</div>
+        <div class="when"     data-rwhen="tom"   onclick="pickReunWhen(this)">Amanhã</div>
+      </div>
+      <input class="qa-inp" id="reun-new-hora" type="time" value="09:00">
+      <button class="qa-confirm" onclick="addReuniao()">Criar e abrir</button>
     </div>
     <div class="qa" id="qa-task">
       <button class="qa-back" onclick="backToChoose()"><i class="ti ti-arrow-left"></i> Voltar</button>
@@ -317,6 +333,15 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
     </div>
   </div>
 
+  <!-- PAINEL DA REUNIÃO (tela cheia) — conduzir a reunião no celular -->
+  <div class="esheet" id="rsheet">
+    <div class="ehead">
+      <div class="et" id="rsheet-title" style="margin-left:4px">Reunião</div>
+      <button class="ebtn" onclick="closeReun()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="ebody" id="rsheet-body"></div>
+  </div>
+
   <div class="toast" id="toast"><i class="ti ti-circle-check"></i><span id="toast-txt"></span></div>
 </div>
 
@@ -360,6 +385,14 @@ let tasks=[
 ];
 let notas=[
   {t:'Pontos da reunião de custos',body:'Carlos manda planilha até sexta. Rever margem da linha doces.'},
+];
+// ───── REUNIÕES (mockup — condutor de reunião no celular) ─────
+let RID=1;
+let reunioes=[
+  {id:RID++,titulo:'Comitê P&D',data:T0,hora:'14:00',status:'agendada',
+   pauta:[{t:'Status do novo rótulo',done:false},{t:'Cronograma da linha especial',done:false}],decisoes:[],ata:''},
+  {id:RID++,titulo:'Reunião de Custos',data:T1,hora:'09:30',status:'agendada',
+   pauta:[{t:'Margem da linha doces',done:false}],decisoes:[],ata:''},
 ];
 
 function bucketOf(t){
@@ -406,6 +439,70 @@ function confCard(t){return el(`<div class="card" style="cursor:default;align-it
     </div>
   </div>`);}
 
+// ───── REUNIÕES: card da lista + painel de condução ─────
+function reunCard(r){
+  const enc=r.status==='encerrada';
+  const pd=r.pauta.filter(p=>p.done).length, pt=r.pauta.length;
+  const ntar=tasks.filter(t=>t.reuniaoId===r.id).length;
+  const meta=[`<span class="c-muted"><i class="ti ti-calendar"></i>${r.data?fmtShort(r.data):'sem data'}${r.hora?' · '+r.hora:''}</span>`];
+  if(pt) meta.push(`<span class="subdot"><i class="ti ti-list-check"></i>${pd}/${pt} pauta</span>`);
+  if(ntar) meta.push(`<span class="subdot"><i class="ti ti-subtask"></i>${ntar} tarefa${ntar>1?'s':''}</span>`);
+  return el(`<div class="card" onclick="openReuniao(${r.id})">
+    <div class="note-ic" style="background:${enc?'var(--bg2)':'color-mix(in srgb,var(--blue-teal) 16%,transparent)'};color:${enc?'var(--text3)':'var(--blue-teal)'}"><i class="ti ti-speakerphone"></i></div>
+    <div class="c-main"><div class="c-title">${esc(r.titulo)}${enc?' <span style="font-size:11px;color:var(--text3);font-weight:700">· encerrada</span>':''}</div><div class="c-meta">${meta.join('')}</div></div>
+  </div>`);
+}
+let curReun=null;
+function openReuniao(id){ curReun=id; renderReunPanel(); document.getElementById('scrim').classList.add('show'); document.getElementById('rsheet').classList.add('show'); }
+function closeReun(){ document.getElementById('scrim').classList.remove('show'); document.getElementById('rsheet').classList.remove('show'); curReun=null; render(); }
+function _curR(){ return reunioes.find(x=>x.id===curReun); }
+function renderReunPanel(){
+  const r=_curR(); if(!r) return; const enc=r.status==='encerrada';
+  document.getElementById('rsheet-title').textContent=r.titulo;
+  const linha=(inner)=>`<div class="sub-item">${inner}</div>`;
+  const pautaHTML = r.pauta.length ? r.pauta.map((p,i)=>linha(`<div class="sub-box${p.done?' on':''}" onclick="reunTogglePauta(${i})"><i class="ti ti-check"></i></div><div class="sub-text${p.done?' done':''}">${esc(p.t)}</div>${enc?'':`<button onclick="reunDelPauta(${i})" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1">×</button>`}`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Sem itens ainda.</div>';
+  const tars=tasks.filter(t=>t.reuniaoId===r.id);
+  const tarsHTML = tars.length ? tars.map(t=>linha(`<div class="sub-box${t.done?' on':''}" onclick="toggleDone(${t.id});renderReunPanel()"><i class="ti ti-check"></i></div><div class="sub-text${t.done?' done':''}">${esc(t.title)}${t.executor?` <span style="color:var(--exec);font-size:12px;font-weight:700">· ${esc(pName(t.executor))}</span>`:''}</div>`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Nenhuma tarefa ainda.</div>';
+  const decHTML = r.decisoes.length ? r.decisoes.map((d,i)=>linha(`<i class="ti ti-point-filled" style="color:var(--blue-teal);font-size:15px;flex-shrink:0"></i><div class="sub-text">${esc(d)}</div>${enc?'':`<button onclick="reunDelDecisao(${i})" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1">×</button>`}`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Nenhuma decisão ainda.</div>';
+  const isel='flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;color:var(--text);outline:none';
+  document.getElementById('rsheet-body').innerHTML=`
+    <div style="font-size:12.5px;color:var(--text3);margin-bottom:16px"><i class="ti ti-calendar"></i> ${r.data?fmtShort(r.data):'sem data'}${r.hora?' · '+r.hora:''}${enc?' · <b style="color:var(--text2)">encerrada</b>':''}</div>
+    <div class="f-row">
+      <div class="f-label"><i class="ti ti-list-check"></i> Pauta</div>
+      <div>${pautaHTML}</div>
+      ${enc?'':`<div class="sub-add"><input id="reun-pauta-inp" placeholder="Novo item da pauta…" onkeydown="if(event.key==='Enter')reunAddPauta()"><button onclick="reunAddPauta()"><i class="ti ti-plus"></i></button></div>`}
+    </div>
+    <div class="f-row">
+      <div class="f-label"><i class="ti ti-subtask"></i> Tarefas da reunião</div>
+      <div>${tarsHTML}</div>
+      ${enc?'':`<div style="display:flex;gap:7px;margin-top:6px"><input id="reun-tar-inp" placeholder="Nova tarefa…" style="${isel}" onkeydown="if(event.key==='Enter')reunAddTarefa()"><select id="reun-tar-exec" class="f-sel" style="width:120px;flex-shrink:0;padding:9px 8px"></select><button onclick="reunAddTarefa()" style="background:var(--blue-mid);border:none;color:#fff;border-radius:8px;width:40px;font-size:16px;cursor:pointer;flex-shrink:0">+</button></div>`}
+    </div>
+    <div class="f-row">
+      <div class="f-label"><i class="ti ti-gavel"></i> Decisões</div>
+      <div>${decHTML}</div>
+      ${enc?'':`<div class="sub-add"><input id="reun-dec-inp" placeholder="Registrar decisão…" onkeydown="if(event.key==='Enter')reunAddDecisao()"><button onclick="reunAddDecisao()"><i class="ti ti-plus"></i></button></div>`}
+    </div>
+    <div class="f-row">
+      <div class="f-label"><i class="ti ti-notes"></i> ATA / notas</div>
+      <textarea id="reun-ata" ${enc?'readonly':''} placeholder="Resumo da reunião…" onblur="reunSetAta(this.value)" style="width:100%;min-height:78px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 12px;font-size:13.5px;font-family:inherit;color:var(--text);outline:none;resize:vertical;line-height:1.45">${esc(r.ata||'')}</textarea>
+    </div>
+    ${enc?'<div class="empty" style="margin-top:4px"><i class="ti ti-flag-check"></i>Reunião encerrada</div>':`<button onclick="reunEncerrar()" style="width:100%;background:var(--blue-teal);color:#fff;border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:4px"><i class="ti ti-flag-check"></i> Encerrar reunião</button>`}`;
+  const sel=document.getElementById('reun-tar-exec');
+  if(sel) sel.innerHTML='<option value="">Sem resp.</option>'+PEOPLE.map(p=>`<option value="${p.id}">${esc(p.name.split(' — ')[0])}</option>`).join('');
+}
+function reunAddPauta(){ const r=_curR(); const inp=document.getElementById('reun-pauta-inp'); const v=inp.value.trim(); if(!v){inp.focus();return;} r.pauta.push({t:v,done:false}); renderReunPanel(); persist(); setTimeout(()=>document.getElementById('reun-pauta-inp')?.focus(),20); }
+function reunTogglePauta(i){ const r=_curR(); r.pauta[i].done=!r.pauta[i].done; renderReunPanel(); persist(); }
+function reunDelPauta(i){ const r=_curR(); r.pauta.splice(i,1); renderReunPanel(); persist(); }
+function reunAddTarefa(){ const r=_curR(); const inp=document.getElementById('reun-tar-inp'); const v=inp.value.trim(); if(!v){inp.focus();return;} const exec=document.getElementById('reun-tar-exec').value; tasks.unshift({id:UID++,title:v,desc:'',date:r.data||null,prio:'media',tipo:'klain',executor:exec,solicitante:ME,status:'todo',tags:[],subs:[],done:false,reuniaoId:r.id,origem:{tipo:'reuniao',nome:r.titulo}}); renderReunPanel(); persist(); showToast('Tarefa criada na reunião','ti-subtask'); setTimeout(()=>document.getElementById('reun-tar-inp')?.focus(),20); }
+function reunAddDecisao(){ const r=_curR(); const inp=document.getElementById('reun-dec-inp'); const v=inp.value.trim(); if(!v){inp.focus();return;} r.decisoes.push(v); renderReunPanel(); persist(); setTimeout(()=>document.getElementById('reun-dec-inp')?.focus(),20); }
+function reunDelDecisao(i){ const r=_curR(); r.decisoes.splice(i,1); renderReunPanel(); persist(); }
+function reunSetAta(v){ const r=_curR(); if(r){ r.ata=v; persist(); } }
+function reunEncerrar(){ const r=_curR(); if(!r||r.status==='encerrada')return; r.status='encerrada'; persist(); renderReunPanel(); showToast('Reunião encerrada','ti-flag-check'); }
+// Criar reunião (pelo FAB)
+let reunWhenSel='today';
+function pickReunWhen(node){ document.querySelectorAll('#qa-reun .when').forEach(w=>w.classList.remove('sel')); node.classList.add('sel'); reunWhenSel=node.dataset.rwhen; }
+function addReuniao(){ const inp=document.getElementById('reun-new-titulo'); const v=inp.value.trim(); if(!v){inp.focus();return;} const r={id:RID++,titulo:v,data:reunWhenSel==='tom'?T1:T0,hora:document.getElementById('reun-new-hora').value||'',status:'agendada',pauta:[],decisoes:[],ata:''}; reunioes.unshift(r); persist(); closeSheets(); switchTab('reunioes'); render(); openReuniao(r.id); }
+
 function render(){
   const fill=(box,arr,maker)=>{box.innerHTML='';if(!arr.length){box.appendChild(el('<div class="empty"><i class="ti ti-checks"></i>Nada por aqui</div>'));return;}arr.forEach((x,i)=>{const c=maker(x);c.style.animationDelay=(i*0.05+0.05)+'s';box.appendChild(c);});};
   fill(document.getElementById('list-late'),tasks.filter(t=>bucketOf(t)==='late'),taskCard);
@@ -415,17 +512,20 @@ function render(){
   fill(document.getElementById('list-solic-req'),tasks.filter(isSolicReq),taskCard);
   fill(document.getElementById('list-solic-conf'),tasks.filter(isSolicConf),confCard);
   fill(document.getElementById('list-notas'),notas,noteCard);
+  fill(document.getElementById('list-reunioes'),reunioes.slice().sort((a,b)=>String(a.data).localeCompare(String(b.data))),reunCard);
   updateCounts();
   persist();
 }
 // Persistência local (por aparelho/navegador) — cada pessoa mantém suas tarefas entre recarregadas.
-function persist(){ try{ localStorage.setItem('tfm_tasks',JSON.stringify(tasks)); localStorage.setItem('tfm_notas',JSON.stringify(notas)); localStorage.setItem('tfm_uid',String(UID)); }catch(e){} }
+function persist(){ try{ localStorage.setItem('tfm_tasks',JSON.stringify(tasks)); localStorage.setItem('tfm_notas',JSON.stringify(notas)); localStorage.setItem('tfm_uid',String(UID)); localStorage.setItem('tfm_reunioes',JSON.stringify(reunioes)); localStorage.setItem('tfm_rid',String(RID)); }catch(e){} }
 function loadStore(){ try{
   const t=JSON.parse(localStorage.getItem('tfm_tasks')||'null'); if(Array.isArray(t)) tasks=t;
   const n=JSON.parse(localStorage.getItem('tfm_notas')||'null'); if(Array.isArray(n)) notas=n;
   const u=parseInt(localStorage.getItem('tfm_uid')||'0',10); if(u>UID) UID=u;
+  const rr=JSON.parse(localStorage.getItem('tfm_reunioes')||'null'); if(Array.isArray(rr)) reunioes=rr;
+  const ri=parseInt(localStorage.getItem('tfm_rid')||'0',10); if(ri>RID) RID=ri;
 }catch(e){} }
-function resetStore(){ if(!confirm('Apagar suas tarefas de teste deste aparelho e voltar ao exemplo?')) return; try{ localStorage.removeItem('tfm_tasks'); localStorage.removeItem('tfm_notas'); localStorage.removeItem('tfm_uid'); }catch(e){} location.reload(); }
+function resetStore(){ if(!confirm('Apagar suas tarefas de teste deste aparelho e voltar ao exemplo?')) return; try{ localStorage.removeItem('tfm_tasks'); localStorage.removeItem('tfm_notas'); localStorage.removeItem('tfm_uid'); localStorage.removeItem('tfm_reunioes'); localStorage.removeItem('tfm_rid'); }catch(e){} location.reload(); }
 function updateCounts(){
   const c=b=>tasks.filter(t=>bucketOf(t)===b&&!t.done).length;
   document.getElementById('tc-late').textContent=c('late');
@@ -437,6 +537,7 @@ function updateCounts(){
   document.getElementById('sc-req').textContent=nreq;
   document.getElementById('sc-conf').textContent=nconf;
   document.getElementById('tc-notas').textContent=notas.length;
+  document.getElementById('tc-reunioes').textContent=reunioes.filter(r=>r.status!=='encerrada').length;
 }
 function switchSolic(which){
   document.querySelectorAll('#solic-seg .seg-opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===which));
@@ -513,7 +614,7 @@ function deleteTask(){if(editingId==null)return;tasks=tasks.filter(x=>x.id!==edi
 // ───── ADD SHEET ─────
 let whenSel='today';
 function toggleSheet(){document.getElementById('sheet').classList.contains('show')?closeSheets():(backToChoose(),document.getElementById('scrim').classList.add('show'),document.getElementById('sheet').classList.add('show'),document.getElementById('fab').classList.add('open'));}
-function closeSheets(){['scrim','sheet','esheet'].forEach(id=>document.getElementById(id).classList.remove('show'));document.getElementById('fab').classList.remove('open');editingId=null;}
+function closeSheets(){['scrim','sheet','esheet','rsheet'].forEach(id=>document.getElementById(id).classList.remove('show'));document.getElementById('fab').classList.remove('open');editingId=null;if(curReun!=null){curReun=null;render();}}
 // Abre direto a captura de TAREFA (usado ao abrir o app — atrito zero pra "largar" a tarefa).
 function openAddTask(){
   backToChoose();
@@ -522,8 +623,8 @@ function openAddTask(){
   document.getElementById('fab').classList.add('open');
   openQA('task');
 }
-function openQA(kind){document.getElementById('sheet-choose').style.display='none';document.getElementById('qa-task').classList.toggle('show',kind==='task');document.getElementById('qa-note').classList.toggle('show',kind==='note');setTimeout(()=>document.getElementById(kind==='task'?'task-inp':'note-inp').focus(),120);}
-function backToChoose(){document.getElementById('sheet-choose').style.display='block';document.getElementById('qa-task').classList.remove('show');document.getElementById('qa-note').classList.remove('show');document.getElementById('task-inp').value='';document.getElementById('note-inp').value='';}
+function openQA(kind){document.getElementById('sheet-choose').style.display='none';document.getElementById('qa-task').classList.toggle('show',kind==='task');document.getElementById('qa-note').classList.toggle('show',kind==='note');document.getElementById('qa-reun').classList.toggle('show',kind==='reun');const foco={task:'task-inp',note:'note-inp',reun:'reun-new-titulo'}[kind];setTimeout(()=>document.getElementById(foco)?.focus(),120);}
+function backToChoose(){document.getElementById('sheet-choose').style.display='block';['qa-task','qa-note','qa-reun'].forEach(id=>document.getElementById(id).classList.remove('show'));document.getElementById('task-inp').value='';document.getElementById('note-inp').value='';document.getElementById('reun-new-titulo').value='';}
 function pickWhen(node){document.querySelectorAll('#qa-task .when').forEach(w=>w.classList.remove('sel'));node.classList.add('sel');whenSel=node.dataset.when;}
 function addTask(){
   const inp=document.getElementById('task-inp'); const v=inp.value.trim(); if(!v){inp.focus();return;}
