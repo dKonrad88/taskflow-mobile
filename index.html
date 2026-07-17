@@ -142,6 +142,24 @@ textarea.qa-inp{resize:none;min-height:84px;line-height:1.4}
 .toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,20px);background:#222;color:#fff;font-size:12.5px;font-weight:600;padding:10px 16px;border-radius:11px;z-index:70;opacity:0;pointer-events:none;transition:all .3s;display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-50%,0)}.toast i{color:var(--blue-teal);font-size:15px}
 
+/* Menu hambúrguer + barra de seção + drawer suspenso (jul/2026: substitui a barra de abas) */
+.hdr-actions{display:flex;align-items:center;gap:8px}
+.section-bar{display:flex;align-items:center;gap:9px;padding:11px 16px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
+.section-bar i{font-size:20px;color:var(--blue-mid)}
+.section-bar .sname{font-size:16px;font-weight:800;color:var(--text)}
+.section-bar .scount{font-size:11px;font-weight:800;background:var(--blue-mid);color:#fff;border-radius:99px;padding:1px 8px}
+.drawer-scrim{position:absolute;inset:0;background:rgba(5,8,15,.5);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s;z-index:65}
+.drawer-scrim.show{opacity:1;pointer-events:auto}
+.drawer{position:absolute;top:0;bottom:0;right:0;width:80%;max-width:300px;background:var(--bg3);z-index:66;transform:translateX(105%);transition:transform .32s cubic-bezier(.32,.72,0,1);box-shadow:-8px 0 34px rgba(0,0,0,.42);display:flex;flex-direction:column;padding-top:calc(16px + env(safe-area-inset-top))}
+.drawer.show{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:4px 14px 10px}
+.drawer-head span{font-size:12px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.drawer-item{display:flex;align-items:center;gap:13px;padding:13px 18px;font-size:15px;font-weight:600;color:var(--text2);background:none;border:none;cursor:pointer;font-family:inherit;text-align:left;width:100%;transition:background .12s}
+.drawer-item:active{background:var(--bg2)}
+.drawer-item.active{color:var(--blue-mid);background:color-mix(in srgb,var(--blue-mid) 9%,transparent)}
+.drawer-item i{font-size:21px;width:24px;text-align:center;flex-shrink:0}
+.drawer-item .dcount{margin-left:auto;font-size:11px;font-weight:800;background:var(--bg2);color:var(--text3);border-radius:99px;padding:1px 8px}
+.drawer-item.active .dcount{background:var(--blue-mid);color:#fff}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 /* No celular real, a tela JÁ é o aparelho — remove a moldura de "celular dentro do celular". */
@@ -159,20 +177,16 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
   <header class="hdr">
     <div class="hdr-top">
       <div class="logo"><i class="ti ti-checkup-list"></i> TaskFlow</div>
-      <button class="icon-btn" onclick="toggleDark()"><i id="theme-ic" class="ti ti-moon"></i></button>
+      <div class="hdr-actions">
+        <button class="icon-btn" onclick="toggleDark()"><i id="theme-ic" class="ti ti-moon"></i></button>
+        <button class="icon-btn" onclick="openDrawer()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
+      </div>
     </div>
     <div class="date-line" id="dateLine">—</div>
   </header>
 
-  <nav class="tabs">
-    <div class="tab active" data-tab="organizar" onclick="switchTab('organizar')">Organizar <span class="tcount" id="tc-organizar">0</span></div>
-    <div class="tab"        data-tab="late"    onclick="switchTab('late')">Atrasadas <span class="tcount" id="tc-late">0</span></div>
-    <div class="tab"        data-tab="today"   onclick="switchTab('today')">Hoje <span class="tcount" id="tc-today">0</span></div>
-    <div class="tab"        data-tab="tom"     onclick="switchTab('tom')">Amanhã <span class="tcount" id="tc-tom">0</span></div>
-    <div class="tab"        data-tab="reunioes" onclick="switchTab('reunioes')">Reuniões <span class="tcount" id="tc-reunioes">0</span></div>
-    <div class="tab"        data-tab="solic"   onclick="switchTab('solic')">Solicitadas <span class="tcount" id="tc-solic">0</span></div>
-    <div class="tab"        data-tab="notas"   onclick="switchTab('notas')">Notas <span class="tcount" id="tc-notas">0</span></div>
-  </nav>
+  <!-- Barra de seção (mostra em qual aba você está) — as abas viraram o menu hambúrguer -->
+  <div class="section-bar"><i id="section-ic" class="ti ti-inbox"></i><span class="sname" id="section-name">Organizar</span><span class="scount" id="section-count" style="display:none">0</span></div>
 
   <main class="body">
     <div class="panel" id="p-late"><div id="list-late"></div></div>
@@ -341,6 +355,13 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
     </div>
     <div class="ebody" id="rsheet-body"></div>
   </div>
+
+  <!-- DRAWER (menu suspenso com as abas) -->
+  <div class="drawer-scrim" id="drawer-scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head"><span>Navegar</span><button class="icon-btn" onclick="closeDrawer()" style="background:var(--bg2);border-color:var(--border);color:var(--text2)"><i class="ti ti-x"></i></button></div>
+    <div id="drawer-items"></div>
+  </aside>
 
   <div class="toast" id="toast"><i class="ti ti-circle-check"></i><span id="toast-txt"></span></div>
 </div>
@@ -528,16 +549,13 @@ function loadStore(){ try{
 function resetStore(){ if(!confirm('Apagar suas tarefas de teste deste aparelho e voltar ao exemplo?')) return; try{ localStorage.removeItem('tfm_tasks'); localStorage.removeItem('tfm_notas'); localStorage.removeItem('tfm_uid'); localStorage.removeItem('tfm_reunioes'); localStorage.removeItem('tfm_rid'); }catch(e){} location.reload(); }
 function updateCounts(){
   const c=b=>tasks.filter(t=>bucketOf(t)===b&&!t.done).length;
-  document.getElementById('tc-late').textContent=c('late');
-  document.getElementById('tc-today').textContent=c('today');
-  document.getElementById('tc-tom').textContent=c('tom');
-  document.getElementById('tc-organizar').textContent=c('organizar');
   const nreq=tasks.filter(isSolicReq).length, nconf=tasks.filter(isSolicConf).length;
-  document.getElementById('tc-solic').textContent=nreq;
-  document.getElementById('sc-req').textContent=nreq;
-  document.getElementById('sc-conf').textContent=nconf;
-  document.getElementById('tc-notas').textContent=notas.length;
-  document.getElementById('tc-reunioes').textContent=reunioes.filter(r=>r.status!=='encerrada').length;
+  const counts={organizar:c('organizar'),late:c('late'),today:c('today'),tom:c('tom'),reunioes:reunioes.filter(r=>r.status!=='encerrada').length,solic:nreq,notas:notas.length};
+  const setC=(id,v)=>{const e=document.getElementById(id); if(!e)return; if(v){e.textContent=v;e.style.display='';}else{e.style.display='none';}};
+  Object.keys(counts).forEach(k=>setC('dc-'+k,counts[k]));       // badges no drawer
+  const sr=document.getElementById('sc-req'); if(sr) sr.textContent=nreq;   // sub-abas de Solicitadas
+  const sc=document.getElementById('sc-conf'); if(sc) sc.textContent=nconf;
+  setC('section-count',counts[_curTab]||0);                     // badge da barra de seção (aba atual)
 }
 function switchSolic(which){
   document.querySelectorAll('#solic-seg .seg-opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===which));
@@ -550,7 +568,33 @@ function switchSolic(which){
 function confirmTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;t.confirmado=true;render();showToast('Confirmada','ti-check');}
 function reopenTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;t.done=false;t.confirmado=false;t.status='doing';render();showToast('Reaberta para o executor','ti-arrow-back-up');}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(!t)return;t.done=!t.done;if(t.done)t.status='done';render();if(t.done)showToast('Concluída','ti-circle-check');}
-function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('p-'+name).classList.add('active');document.querySelector('.body').scrollTop=0;}
+// Abas viraram o menu hambúrguer (jul/2026). MTABS = fonte única (id/ícone/label).
+const MTABS=[
+  {id:'organizar',ic:'ti-inbox',lbl:'Organizar'},
+  {id:'late',     ic:'ti-alarm',lbl:'Atrasadas'},
+  {id:'today',    ic:'ti-sun',  lbl:'Hoje'},
+  {id:'tom',      ic:'ti-sunset',lbl:'Amanhã'},
+  {id:'reunioes', ic:'ti-speakerphone',lbl:'Reuniões'},
+  {id:'solic',    ic:'ti-send', lbl:'Solicitadas'},
+  {id:'notas',    ic:'ti-note', lbl:'Notas'},
+];
+let _curTab='organizar';
+function _buildDrawer(){ const box=document.getElementById('drawer-items'); if(!box) return;
+  box.innerHTML=MTABS.map(t=>`<button class="drawer-item${t.id===_curTab?' active':''}" data-tab="${t.id}" onclick="drawerGo('${t.id}')"><i class="ti ${t.ic}"></i> ${t.lbl} <span class="dcount" id="dc-${t.id}" style="display:none">0</span></button>`).join(''); }
+function openDrawer(){ document.getElementById('drawer-scrim').classList.add('show'); document.getElementById('drawer').classList.add('show'); }
+function closeDrawer(){ document.getElementById('drawer-scrim').classList.remove('show'); document.getElementById('drawer').classList.remove('show'); }
+function drawerGo(name){ switchTab(name); closeDrawer(); }
+function switchTab(name){
+  _curTab=name;
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const pnl=document.getElementById('p-'+name); if(pnl) pnl.classList.add('active');
+  document.querySelectorAll('.drawer-item').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  const meta=MTABS.find(t=>t.id===name)||MTABS[0];
+  const si=document.getElementById('section-ic'); if(si) si.className='ti '+meta.ic;
+  const sn=document.getElementById('section-name'); if(sn) sn.textContent=meta.lbl;
+  updateCounts();
+  const bd=document.querySelector('.body'); if(bd) bd.scrollTop=0;
+}
 
 function setDate(){const s=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});document.getElementById('dateLine').textContent=s.charAt(0).toUpperCase()+s.slice(1);}
 function toggleDark(){document.body.classList.toggle('dark');document.getElementById('theme-ic').className='ti '+(document.body.classList.contains('dark')?'ti-sun':'ti-moon');}
@@ -659,6 +703,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 loadStore();          // carrega dados salvos neste aparelho (se houver) antes de desenhar
 setDate();render();
+_buildDrawer(); switchTab('organizar');   // monta o menu e ajusta a barra de seção
 // abre no Organizar com o campo de captura já no topo (sem modal automático)
 setTimeout(()=>{const i=document.getElementById('inl-inp');if(i)i.focus();},300);
 </script>
