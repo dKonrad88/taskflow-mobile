@@ -20,6 +20,15 @@ body.dark{
   --border:#38383f;--card:#2e2e35;--exec:#6aa9e0;
   --danger:#e08080;
 }
+/* Tema "Biscoito Klain" — creme + acentos caramelo (os mesmos valores do app principal).
+   O cabeçalho usa --blue-* no gradiente, então vira marrom/caramelo automaticamente. */
+body.klain{
+  --bg:#e9e0ce;--bg2:#e1d5bc;--bg3:#fbf6ec;
+  --text:#392a18;--text2:#6a5637;--text3:#8a7656;
+  --border:#d7c8a6;--card:#fbf6ec;--exec:#9a6a2e;
+  --danger:#a33232;
+  --blue-dark:#5c3d1f;--blue-mid:#9a6a2e;--blue-teal:#b0863f;
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:radial-gradient(900px 600px at 50% -10%,rgba(24,95,165,.22),transparent 60%),radial-gradient(700px 500px at 100% 110%,rgba(13,61,107,.30),transparent 55%),#0a0e1a;display:flex;align-items:center;justify-content:center;padding:14px;color:var(--text)}
@@ -72,7 +81,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .empty{text-align:center;padding:34px 18px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:var(--radius)}
 .empty i{font-size:30px;display:block;margin-bottom:8px;opacity:.5}
 
-.fab{position:absolute;right:18px;bottom:22px;width:60px;height:60px;border-radius:20px;border:none;cursor:pointer;z-index:40;background:linear-gradient(135deg,var(--blue-mid),var(--blue-teal));color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(24,95,165,.55);transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.fab{position:absolute;right:18px;bottom:22px;width:60px;height:60px;border-radius:20px;border:none;cursor:pointer;z-index:40;background:linear-gradient(135deg,#185FA5,#1a7a8a);color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(24,95,165,.55);transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
 .fab i{transition:transform .3s}.fab:active{transform:scale(.92)}.fab.open{transform:rotate(45deg)}
 .scrim{position:absolute;inset:0;background:rgba(5,8,15,.5);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s;z-index:45}
 .scrim.show{opacity:1;pointer-events:auto}
@@ -178,7 +187,7 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
     <div class="hdr-top">
       <div class="logo"><i class="ti ti-checkup-list"></i> TaskFlow</div>
       <div class="hdr-actions">
-        <button class="icon-btn" onclick="toggleDark()"><i id="theme-ic" class="ti ti-moon"></i></button>
+        <button class="icon-btn" onclick="cycleTheme()" title="Tema (toque para trocar)"><i id="theme-ic" class="ti ti-moon"></i></button>
         <button class="icon-btn" onclick="openDrawer()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
       </div>
     </div>
@@ -669,7 +678,16 @@ function switchTab(name){
 }
 
 function setDate(){const s=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});document.getElementById('dateLine').textContent=s.charAt(0).toUpperCase()+s.slice(1);}
-function toggleDark(){document.body.classList.toggle('dark');document.getElementById('theme-ic').className='ti '+(document.body.classList.contains('dark')?'ti-sun':'ti-moon');}
+// Tema: cicla claro → Klain → escuro (persiste em tfm_theme). O ícone mostra o tema ATUAL.
+const THEMES=['light','klain','dark'];
+function applyTheme(t){
+  document.body.classList.remove('dark','klain');
+  if(t==='dark') document.body.classList.add('dark'); else if(t==='klain') document.body.classList.add('klain');
+  const ic={light:'ti-sun',klain:'ti-cookie',dark:'ti-moon'}[t]||'ti-sun';
+  const el=document.getElementById('theme-ic'); if(el) el.className='ti '+ic;
+  try{ localStorage.setItem('tfm_theme',t); }catch(e){}
+}
+function cycleTheme(){ const cur=localStorage.getItem('tfm_theme')||'light'; const i=THEMES.indexOf(cur); applyTheme(THEMES[((i<0?0:i)+1)%THEMES.length]); }
 
 // ───── EDIT ─────
 let editingId=null, editSubs=[], editTags=[];
@@ -774,6 +792,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const d=document.getElementById('ed-desc');d.addEventListener('input',()=>{d.style.height='auto';d.style.height=d.scrollHeight+'px';});
 });
 loadStore();          // carrega dados salvos neste aparelho (se houver) antes de desenhar
+applyTheme(localStorage.getItem('tfm_theme')||'light');   // aplica o tema salvo (claro/Klain/escuro)
 setDate();render();
 _buildDrawer(); switchTab('organizar');   // monta o menu e ajusta a barra de seção
 // abre no Organizar com o campo de captura já no topo (sem modal automático)
