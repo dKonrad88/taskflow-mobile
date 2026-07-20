@@ -216,6 +216,10 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
       <div class="panel-hint"><i class="ti ti-inbox"></i> Capturas sem dono — classifique depois</div>
       <div id="list-organizar"></div>
     </div>
+    <div class="panel" id="p-projetos">
+      <div class="panel-hint"><i class="ti ti-folder"></i> Toque num projeto para ver e concluir as tarefas dele</div>
+      <div id="list-projetos"></div>
+    </div>
     <div class="panel" id="p-reunioes">
       <div class="panel-hint"><i class="ti ti-speakerphone"></i> Conduza a reunião pelo celular — pauta, tarefas, decisões e ATA</div>
       <div id="list-reunioes"></div>
@@ -356,6 +360,15 @@ body.dark .toast{background:#0d0d10}.toast.show{opacity:1;transform:translate(-5
     <div class="ebody" id="rsheet-body"></div>
   </div>
 
+  <!-- PAINEL DO PROJETO (tela cheia) — tarefas do projeto no celular -->
+  <div class="esheet" id="psheet">
+    <div class="ehead">
+      <div class="et" id="psheet-title" style="margin-left:4px">Projeto</div>
+      <button class="ebtn" onclick="closeProj()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="ebody" id="psheet-body"></div>
+  </div>
+
   <!-- DRAWER (menu suspenso com as abas) -->
   <div class="drawer-scrim" id="drawer-scrim" onclick="closeDrawer()"></div>
   <aside class="drawer" id="drawer">
@@ -411,9 +424,11 @@ let notas=[
 let RID=1;
 let reunioes=[
   {id:RID++,titulo:'Comitê P&D',data:T0,hora:'14:00',status:'agendada',
-   pauta:[{t:'Status do novo rótulo',done:false},{t:'Cronograma da linha especial',done:false}],decisoes:[],ata:''},
+   pauta:[{t:'Status do novo rótulo',done:false},{t:'Cronograma da linha especial',done:false}],decisoes:[],ata:'',
+   participantes:['diego','debora','francielle'],presentes:[]},
   {id:RID++,titulo:'Reunião de Custos',data:T1,hora:'09:30',status:'agendada',
-   pauta:[{t:'Margem da linha doces',done:false}],decisoes:[],ata:''},
+   pauta:[{t:'Margem da linha doces',done:false}],decisoes:[],ata:'',
+   participantes:['diego','stefano','joel'],presentes:[]},
 ];
 
 function bucketOf(t){
@@ -465,7 +480,9 @@ function reunCard(r){
   const enc=r.status==='encerrada';
   const pd=r.pauta.filter(p=>p.done).length, pt=r.pauta.length;
   const ntar=tasks.filter(t=>t.reuniaoId===r.id).length;
+  const np=(r.participantes||[]).length;
   const meta=[`<span class="c-muted"><i class="ti ti-calendar"></i>${r.data?fmtShort(r.data):'sem data'}${r.hora?' · '+r.hora:''}</span>`];
+  if(np) meta.push(`<span class="subdot"><i class="ti ti-users"></i>${np}</span>`);
   if(pt) meta.push(`<span class="subdot"><i class="ti ti-list-check"></i>${pd}/${pt} pauta</span>`);
   if(ntar) meta.push(`<span class="subdot"><i class="ti ti-subtask"></i>${ntar} tarefa${ntar>1?'s':''}</span>`);
   return el(`<div class="card" onclick="openReuniao(${r.id})">
@@ -486,8 +503,16 @@ function renderReunPanel(){
   const tarsHTML = tars.length ? tars.map(t=>linha(`<div class="sub-box${t.done?' on':''}" onclick="toggleDone(${t.id});renderReunPanel()"><i class="ti ti-check"></i></div><div class="sub-text${t.done?' done':''}">${esc(t.title)}${t.executor?` <span style="color:var(--exec);font-size:12px;font-weight:700">· ${esc(pName(t.executor))}</span>`:''}</div>`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Nenhuma tarefa ainda.</div>';
   const decHTML = r.decisoes.length ? r.decisoes.map((d,i)=>linha(`<i class="ti ti-point-filled" style="color:var(--blue-teal);font-size:15px;flex-shrink:0"></i><div class="sub-text">${esc(d)}</div>${enc?'':`<button onclick="reunDelDecisao(${i})" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1">×</button>`}`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Nenhuma decisão ainda.</div>';
   const isel='flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;color:var(--text);outline:none';
+  const parts=r.participantes||[], pres=r.presentes||[];
+  const partHTML = parts.length ? parts.map(pid=>linha(`<div class="sub-box${pres.includes(pid)?' on':''}" onclick="reunTogglePresenca('${pid}')" title="Marcar presença"><i class="ti ti-check"></i></div><div class="sub-text">${esc(pName(pid))}</div>${enc?'':`<button onclick="reunRemoveParticipante('${pid}')" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1">×</button>`}`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Ninguém adicionado ainda.</div>';
+  const dispo=PEOPLE.filter(p=>!parts.includes(p.id));
   document.getElementById('rsheet-body').innerHTML=`
     <div style="font-size:12.5px;color:var(--text3);margin-bottom:16px"><i class="ti ti-calendar"></i> ${r.data?fmtShort(r.data):'sem data'}${r.hora?' · '+r.hora:''}${enc?' · <b style="color:var(--text2)">encerrada</b>':''}</div>
+    <div class="f-row">
+      <div class="f-label"><i class="ti ti-users"></i> Participantes ${parts.length?`<span style="text-transform:none;letter-spacing:0;font-weight:700;color:var(--text2)">· ${pres.length}/${parts.length} presente${pres.length===1?'':'s'}</span>`:''}</div>
+      <div>${partHTML}</div>
+      ${enc?'':`<select class="f-sel" style="margin-top:6px" onchange="reunAddParticipante(this.value)"><option value="">+ Adicionar participante…</option>${dispo.map(p=>`<option value="${p.id}">${esc(p.name.split(' — ')[0])}</option>`).join('')}</select>`}
+    </div>
     <div class="f-row">
       <div class="f-label"><i class="ti ti-list-check"></i> Pauta</div>
       <div>${pautaHTML}</div>
@@ -519,10 +544,54 @@ function reunAddDecisao(){ const r=_curR(); const inp=document.getElementById('r
 function reunDelDecisao(i){ const r=_curR(); r.decisoes.splice(i,1); renderReunPanel(); persist(); }
 function reunSetAta(v){ const r=_curR(); if(r){ r.ata=v; persist(); } }
 function reunEncerrar(){ const r=_curR(); if(!r||r.status==='encerrada')return; r.status='encerrada'; persist(); renderReunPanel(); showToast('Reunião encerrada','ti-flag-check'); }
+function reunAddParticipante(id){ if(!id)return; const r=_curR(); if(!r)return; if(!r.participantes)r.participantes=[]; if(!r.participantes.includes(id))r.participantes.push(id); renderReunPanel(); persist(); }
+function reunRemoveParticipante(id){ const r=_curR(); if(!r)return; r.participantes=(r.participantes||[]).filter(x=>x!==id); r.presentes=(r.presentes||[]).filter(x=>x!==id); renderReunPanel(); persist(); }
+function reunTogglePresenca(id){ const r=_curR(); if(!r)return; if(!r.presentes)r.presentes=[]; const i=r.presentes.indexOf(id); if(i>=0)r.presentes.splice(i,1); else r.presentes.push(id); renderReunPanel(); persist(); }
 // Criar reunião (pelo FAB)
 let reunWhenSel='today';
 function pickReunWhen(node){ document.querySelectorAll('#qa-reun .when').forEach(w=>w.classList.remove('sel')); node.classList.add('sel'); reunWhenSel=node.dataset.rwhen; }
-function addReuniao(){ const inp=document.getElementById('reun-new-titulo'); const v=inp.value.trim(); if(!v){inp.focus();return;} const r={id:RID++,titulo:v,data:reunWhenSel==='tom'?T1:T0,hora:document.getElementById('reun-new-hora').value||'',status:'agendada',pauta:[],decisoes:[],ata:''}; reunioes.unshift(r); persist(); closeSheets(); switchTab('reunioes'); render(); openReuniao(r.id); }
+function addReuniao(){ const inp=document.getElementById('reun-new-titulo'); const v=inp.value.trim(); if(!v){inp.focus();return;} const r={id:RID++,titulo:v,data:reunWhenSel==='tom'?T1:T0,hora:document.getElementById('reun-new-hora').value||'',status:'agendada',pauta:[],decisoes:[],ata:'',participantes:[ME],presentes:[]}; reunioes.unshift(r); persist(); closeSheets(); switchTab('reunioes'); render(); openReuniao(r.id); }
+
+// ───── PROJETOS: card da lista + painel (tarefas do projeto no celular) ─────
+function projTasks(nome){ return tasks.filter(t=>t.origem&&t.origem.tipo==='projeto'&&t.origem.nome===nome); }
+function projCard(nome){
+  const ts=projTasks(nome), done=ts.filter(t=>t.done).length, tot=ts.length, pct=tot?Math.round(done/tot*100):0;
+  const i=PROJETOS.indexOf(nome);
+  return el(`<div class="card" onclick="openProjeto(${i})">
+    <div class="note-ic" style="background:color-mix(in srgb,var(--blue-mid) 14%,transparent);color:var(--blue-mid)"><i class="ti ti-folder"></i></div>
+    <div class="c-main">
+      <div class="c-title">${esc(nome)}</div>
+      <div class="c-meta" style="gap:9px;margin-top:9px">
+        <div style="flex:1;height:6px;background:var(--bg2);border-radius:99px;overflow:hidden;min-width:70px"><div style="height:100%;background:var(--blue-mid);width:${pct}%"></div></div>
+        <span class="subdot"><i class="ti ti-subtask"></i>${done}/${tot}</span>
+      </div>
+    </div>
+  </div>`);
+}
+let curProj=null;
+function openProjeto(i){ curProj=PROJETOS[i]; if(curProj==null)return; renderProjPanel(); document.getElementById('scrim').classList.add('show'); document.getElementById('psheet').classList.add('show'); }
+function closeProj(){ document.getElementById('scrim').classList.remove('show'); document.getElementById('psheet').classList.remove('show'); curProj=null; render(); }
+function renderProjPanel(){
+  const nome=curProj; if(nome==null)return;
+  const ts=projTasks(nome), done=ts.filter(t=>t.done).length, tot=ts.length, pct=tot?Math.round(done/tot*100):0;
+  document.getElementById('psheet-title').textContent=nome;
+  const linha=(inner)=>`<div class="sub-item">${inner}</div>`;
+  const isel='flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;color:var(--text);outline:none';
+  const tarsHTML = ts.length ? ts.map(t=>linha(`<div class="sub-box${t.done?' on':''}" onclick="toggleDone(${t.id});renderProjPanel()"><i class="ti ti-check"></i></div><div class="sub-text${t.done?' done':''}">${esc(t.title)}${t.executor?` <span style="color:var(--exec);font-size:12px;font-weight:700">· ${esc(pName(t.executor))}</span>`:''}</div>`)).join('') : '<div style="font-size:12.5px;color:var(--text3);padding:4px 0">Nenhuma tarefa neste projeto ainda.</div>';
+  document.getElementById('psheet-body').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+      <div style="flex:1;height:8px;background:var(--bg2);border-radius:99px;overflow:hidden"><div style="height:100%;background:var(--blue-mid);width:${pct}%"></div></div>
+      <span style="font-size:13px;font-weight:800;color:var(--blue-mid);white-space:nowrap">${pct}% · ${done}/${tot}</span>
+    </div>
+    <div class="f-row">
+      <div class="f-label"><i class="ti ti-subtask"></i> Tarefas do projeto</div>
+      <div>${tarsHTML}</div>
+      <div style="display:flex;gap:7px;margin-top:6px"><input id="proj-tar-inp" placeholder="Nova tarefa…" style="${isel}" onkeydown="if(event.key==='Enter')projAddTarefa()"><select id="proj-tar-exec" class="f-sel" style="width:120px;flex-shrink:0;padding:9px 8px"></select><button onclick="projAddTarefa()" style="background:var(--blue-mid);border:none;color:#fff;border-radius:8px;width:40px;font-size:16px;cursor:pointer;flex-shrink:0">+</button></div>
+    </div>`;
+  const sel=document.getElementById('proj-tar-exec');
+  if(sel) sel.innerHTML='<option value="">Sem resp.</option>'+PEOPLE.map(p=>`<option value="${p.id}">${esc(p.name.split(' — ')[0])}</option>`).join('');
+}
+function projAddTarefa(){ const inp=document.getElementById('proj-tar-inp'); const v=inp.value.trim(); if(!v){inp.focus();return;} const exec=document.getElementById('proj-tar-exec').value; tasks.unshift({id:UID++,title:v,desc:'',date:null,prio:'media',tipo:'klain',executor:exec,solicitante:ME,status:'todo',tags:[],subs:[],done:false,origem:{tipo:'projeto',nome:curProj}}); renderProjPanel(); persist(); showToast('Tarefa criada no projeto','ti-subtask'); setTimeout(()=>document.getElementById('proj-tar-inp')?.focus(),20); }
 
 function render(){
   const fill=(box,arr,maker)=>{box.innerHTML='';if(!arr.length){box.appendChild(el('<div class="empty"><i class="ti ti-checks"></i>Nada por aqui</div>'));return;}arr.forEach((x,i)=>{const c=maker(x);c.style.animationDelay=(i*0.05+0.05)+'s';box.appendChild(c);});};
@@ -533,6 +602,7 @@ function render(){
   fill(document.getElementById('list-solic-req'),tasks.filter(isSolicReq),taskCard);
   fill(document.getElementById('list-solic-conf'),tasks.filter(isSolicConf),confCard);
   fill(document.getElementById('list-notas'),notas,noteCard);
+  fill(document.getElementById('list-projetos'),PROJETOS,projCard);
   fill(document.getElementById('list-reunioes'),reunioes.slice().sort((a,b)=>String(a.data).localeCompare(String(b.data))),reunCard);
   updateCounts();
   persist();
@@ -544,13 +614,14 @@ function loadStore(){ try{
   const n=JSON.parse(localStorage.getItem('tfm_notas')||'null'); if(Array.isArray(n)) notas=n;
   const u=parseInt(localStorage.getItem('tfm_uid')||'0',10); if(u>UID) UID=u;
   const rr=JSON.parse(localStorage.getItem('tfm_reunioes')||'null'); if(Array.isArray(rr)) reunioes=rr;
+  reunioes.forEach(r=>{ if(!Array.isArray(r.participantes))r.participantes=[]; if(!Array.isArray(r.presentes))r.presentes=[]; if(!Array.isArray(r.pauta))r.pauta=[]; if(!Array.isArray(r.decisoes))r.decisoes=[]; });
   const ri=parseInt(localStorage.getItem('tfm_rid')||'0',10); if(ri>RID) RID=ri;
 }catch(e){} }
 function resetStore(){ if(!confirm('Apagar suas tarefas de teste deste aparelho e voltar ao exemplo?')) return; try{ localStorage.removeItem('tfm_tasks'); localStorage.removeItem('tfm_notas'); localStorage.removeItem('tfm_uid'); localStorage.removeItem('tfm_reunioes'); localStorage.removeItem('tfm_rid'); }catch(e){} location.reload(); }
 function updateCounts(){
   const c=b=>tasks.filter(t=>bucketOf(t)===b&&!t.done).length;
   const nreq=tasks.filter(isSolicReq).length, nconf=tasks.filter(isSolicConf).length;
-  const counts={organizar:c('organizar'),late:c('late'),today:c('today'),tom:c('tom'),reunioes:reunioes.filter(r=>r.status!=='encerrada').length,solic:nreq,notas:notas.length};
+  const counts={organizar:c('organizar'),late:c('late'),today:c('today'),tom:c('tom'),projetos:PROJETOS.length,reunioes:reunioes.filter(r=>r.status!=='encerrada').length,solic:nreq,notas:notas.length};
   const setC=(id,v)=>{const e=document.getElementById(id); if(!e)return; if(v){e.textContent=v;e.style.display='';}else{e.style.display='none';}};
   Object.keys(counts).forEach(k=>setC('dc-'+k,counts[k]));       // badges no drawer
   const sr=document.getElementById('sc-req'); if(sr) sr.textContent=nreq;   // sub-abas de Solicitadas
@@ -574,6 +645,7 @@ const MTABS=[
   {id:'late',     ic:'ti-alarm',lbl:'Atrasadas'},
   {id:'today',    ic:'ti-sun',  lbl:'Hoje'},
   {id:'tom',      ic:'ti-sunset',lbl:'Amanhã'},
+  {id:'projetos', ic:'ti-folder',lbl:'Projetos'},
   {id:'reunioes', ic:'ti-speakerphone',lbl:'Reuniões'},
   {id:'solic',    ic:'ti-send', lbl:'Solicitadas'},
   {id:'notas',    ic:'ti-note', lbl:'Notas'},
@@ -658,7 +730,7 @@ function deleteTask(){if(editingId==null)return;tasks=tasks.filter(x=>x.id!==edi
 // ───── ADD SHEET ─────
 let whenSel='today';
 function toggleSheet(){document.getElementById('sheet').classList.contains('show')?closeSheets():(backToChoose(),document.getElementById('scrim').classList.add('show'),document.getElementById('sheet').classList.add('show'),document.getElementById('fab').classList.add('open'));}
-function closeSheets(){['scrim','sheet','esheet','rsheet'].forEach(id=>document.getElementById(id).classList.remove('show'));document.getElementById('fab').classList.remove('open');editingId=null;if(curReun!=null){curReun=null;render();}}
+function closeSheets(){['scrim','sheet','esheet','rsheet','psheet'].forEach(id=>document.getElementById(id).classList.remove('show'));document.getElementById('fab').classList.remove('open');editingId=null;if(curReun!=null){curReun=null;render();}if(curProj!=null){curProj=null;render();}}
 // Abre direto a captura de TAREFA (usado ao abrir o app — atrito zero pra "largar" a tarefa).
 function openAddTask(){
   backToChoose();
